@@ -6,3 +6,4 @@ cmake-build-*/
 /.idea/modules.xml
 /.idea/LOnOff.iml
 /.idea/.gitignore
+/.idea/workspace.xml
