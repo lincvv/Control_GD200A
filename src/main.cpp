@@ -18,11 +18,6 @@ Stash stash;
 
 
 
-void check_timer();
-void check_state(uint8_t state);
-
-
-
 static void request () {
     byte sd = stash.create();
 
@@ -62,6 +57,7 @@ void setup () {
 //    wdt_enable(WDTO_4S);
 
     pinMode(PIN_OUT_ON, OUTPUT);
+    set_state(eeprom_read_byte(0));
     Serial.begin(115200);
 
     if(MCUSR & (1 << PORF)) { // POR
@@ -69,16 +65,13 @@ void setup () {
         digitalWrite(PIN_OUT_ON, LOW);
     } else if (MCUSR & (1 << EXTRF)) { // External Reset
         Serial.println("External Reset");
-        check_state(isOn);
+        set_state(isOn);
 
     } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
         Serial.println("Watchdog Reset");
-        check_state(isOn);
+        set_state(isOn);
     }
 
-//    digitalWrite(PIN_OUT_ON, LOW);
-
-    check_state(eeprom_read_byte(0));
     Serial.println(isOn);
     Serial.println(F("\n[webClient]"));
 
@@ -154,7 +147,7 @@ void loop () {
         }
 
 
-        check_state(isOn);
+        set_state(isOn);
 //        wdt_reset();
 
 
@@ -165,11 +158,13 @@ void loop () {
 void check_timer(){
     if((time_off * 60) / (REQUEST_INTERVAL / 1000) == count_off){
         digitalWrite(PIN_OUT_ON, LOW);
+        eeprom_write_byte(0, 0);
+        setup();
     }
     count_off++;
 }
 
-void check_state(const uint8_t state){
+void set_state(uint8_t state){
     if (state == 1)
     {
         digitalWrite(PIN_OUT_ON, HIGH);
