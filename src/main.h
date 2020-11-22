@@ -8,5 +8,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <EtherCard.h>
+#include "string.h"
+
+#define REQUEST_INTERVAL 5000
 
 #endif //LONOFF_MAIN_H
