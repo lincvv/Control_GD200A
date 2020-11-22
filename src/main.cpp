@@ -12,13 +12,15 @@ void(* resetFunc) (void) = 0;
 static uint32_t timer;
 static byte session;
 uint8_t count_off = 0;
-uint8_t time_off;
-uint8_t isOn = 0;
+uint8_t time_off = 0;
+uint8_t *isOn = reinterpret_cast<uint8_t *>(0x101);
 Stash stash;
 
 
 
 void check_timer();
+void check_state(const uint8_t *state);
+
 
 
 static void request () {
@@ -57,18 +59,28 @@ static void request () {
 
 
 void setup () {
-    if(MCUSR & (1 << 0)) { // POR
-        digitalWrite(PIN_OUT_ON, LOW);
-    } else if (MCUSR & (1 << 1)) { // External Reset
-        digitalWrite(PIN_OUT_ON, HIGH);
-    }
+//    wdt_enable(WDTO_4S);
+
     pinMode(PIN_OUT_ON, OUTPUT);
-    digitalWrite(PIN_OUT_ON, LOW);
-
-
     Serial.begin(115200);
+
+    if(MCUSR & (1 << PORF)) { // POR
+        Serial.println("POR");
+        digitalWrite(PIN_OUT_ON, LOW);
+    } else if (MCUSR & (1 << EXTRF)) { // External Reset
+        Serial.println("External Reset");
+        check_state(isOn);
+
+    } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
+        Serial.println("Watchdog Reset");
+        check_state(isOn);
+    }
+
+//    digitalWrite(PIN_OUT_ON, LOW);
+
+
+    Serial.println(*isOn);
     Serial.println(F("\n[webClient]"));
-    Serial.println(time_off);
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0)
         Serial.println(F("Failed to access Ethernet controller"));
@@ -131,24 +143,18 @@ void loop () {
             Serial.println(error.c_str());
             check_timer();
         } else{
-            isOn = doc["IsOn"];
+            *isOn = doc["IsOn"];
             time_off = doc["Time"];
             count_off = 0;
-            Serial.println(isOn);
+            Serial.println(*isOn);
             Serial.println(time_off);
             _delay_ms(10000);
             resetFunc();
         }
 
 
-        if (isOn == 1)
-        {
-            digitalWrite(PIN_OUT_ON, HIGH);
-        }
-        else
-        {
-            digitalWrite(PIN_OUT_ON, LOW);
-        }
+        check_state(isOn);
+//        wdt_reset();
 
 
 
@@ -160,4 +166,15 @@ void check_timer(){
         digitalWrite(PIN_OUT_ON, LOW);
     }
     count_off++;
+}
+
+void check_state(const uint8_t *state){
+    if (*state == 1)
+    {
+        digitalWrite(PIN_OUT_ON, HIGH);
+    }
+    else
+    {
+        digitalWrite(PIN_OUT_ON, LOW);
+    }
 }

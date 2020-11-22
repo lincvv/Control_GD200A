@@ -8,7 +8,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <EtherCard.h>
-#include "string.h"
+//#include "string.h"
+#include <avr/wdt.h>
 
 #define REQUEST_INTERVAL 5000
 
