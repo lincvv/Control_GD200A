@@ -13,13 +13,13 @@ static uint32_t timer;
 static byte session;
 uint8_t count_off = 0;
 uint8_t time_off = 0;
-uint8_t *isOn = reinterpret_cast<uint8_t *>(0x101);
+uint8_t isOn;
 Stash stash;
 
 
 
 void check_timer();
-void check_state(const uint8_t *state);
+void check_state(uint8_t state);
 
 
 
@@ -78,8 +78,8 @@ void setup () {
 
 //    digitalWrite(PIN_OUT_ON, LOW);
 
-
-    Serial.println(*isOn);
+    check_state(eeprom_read_byte(0));
+    Serial.println(isOn);
     Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0)
@@ -143,13 +143,14 @@ void loop () {
             Serial.println(error.c_str());
             check_timer();
         } else{
-            *isOn = doc["IsOn"];
+            isOn = doc["IsOn"];
             time_off = doc["Time"];
             count_off = 0;
-            Serial.println(*isOn);
+            Serial.println(isOn);
             Serial.println(time_off);
-            _delay_ms(10000);
-            resetFunc();
+            eeprom_write_byte(0, isOn);
+//            _delay_ms(10000);
+//            resetFunc();
         }
 
 
@@ -168,8 +169,8 @@ void check_timer(){
     count_off++;
 }
 
-void check_state(const uint8_t *state){
-    if (*state == 1)
+void check_state(const uint8_t state){
+    if (state == 1)
     {
         digitalWrite(PIN_OUT_ON, HIGH);
     }
