@@ -15,6 +15,7 @@ uint8_t count_off = 0;
 uint8_t time_off = 0;
 uint8_t isOn;
 Stash stash;
+byte EEMEM dataB_addr;
 
 
 
@@ -55,24 +56,30 @@ static void request () {
 
 void setup () {
 //    wdt_enable(WDTO_4S);
-
     pinMode(PIN_OUT_ON, OUTPUT);
-    set_state(eeprom_read_byte(0));
+    isOn = EEPROM.read(1);
     Serial.begin(115200);
-
-    if(MCUSR & (1 << PORF)) { // POR
-        Serial.println("POR");
-        digitalWrite(PIN_OUT_ON, LOW);
-    } else if (MCUSR & (1 << EXTRF)) { // External Reset
-        Serial.println("External Reset");
-        set_state(isOn);
-
-    } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
-        Serial.println("Watchdog Reset");
-        set_state(isOn);
-    }
-
+    Serial.print("ISON: ");
     Serial.println(isOn);
+
+    if((isOn != 0) | (isOn != 1)){
+        isOn = 0;
+        EEPROM.write(1, isOn);
+    }
+    set_state(isOn);
+
+//    if(MCUSR & (1 << PORF)) { // POR
+//        Serial.println("POR");
+//        digitalWrite(PIN_OUT_ON, LOW);
+//    } else if (MCUSR & (1 << EXTRF)) { // External Reset
+//        Serial.println("External Reset");
+//        set_state(isOn);
+//
+//    } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
+//        Serial.println("Watchdog Reset");
+//        set_state(isOn);
+//    }
+
     Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0)
@@ -129,6 +136,7 @@ void loop () {
         String resp = reply;
         resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
 
+        Serial.println(resp);
         StaticJsonDocument<200> doc;
         DeserializationError error = deserializeJson(doc, resp);
         if (error) {
@@ -136,14 +144,19 @@ void loop () {
             Serial.println(error.c_str());
             check_timer();
         } else{
-            isOn = doc["IsOn"];
+            uint8_t temp;
+            temp = doc["IsOn"];
             time_off = doc["Time"];
+            if (temp != isOn){
+                EEPROM.update(1, temp);
+                isOn = temp;
+            }
+
             count_off = 0;
+//            Serial.print("Data IsOn: ");
             Serial.println(isOn);
+//            Serial.print("Time to off: ");
             Serial.println(time_off);
-            eeprom_write_byte(0, isOn);
-//            _delay_ms(10000);
-//            resetFunc();
         }
 
 
@@ -158,8 +171,8 @@ void loop () {
 void check_timer(){
     if((time_off * 60) / (REQUEST_INTERVAL / 1000) == count_off){
         digitalWrite(PIN_OUT_ON, LOW);
-        eeprom_write_byte(0, 0);
-        setup();
+        EEPROM.update(1, isOn);
+//        resetFunc();
     }
     count_off++;
 }

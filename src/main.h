@@ -9,7 +9,8 @@
 #include <ArduinoJson.h>
 #include <EtherCard.h>
 #include <avr/wdt.h>
-#include <avr/eeprom.h>
+//#include <avr/eeprom.h>
+#include <EEPROM.h>
 
 #define REQUEST_INTERVAL 5000
 
