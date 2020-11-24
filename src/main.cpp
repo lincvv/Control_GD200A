@@ -1,4 +1,3 @@
-
 #include "main.h"
 
 #define PIN_OUT_ON 4
@@ -8,14 +7,16 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[500];
 
 const char website[] PROGMEM = "test.itlab.com.ua";
-void(* resetFunc) (void) = 0;
+
+//void(* resetFunc) (void) = 0;
+
 static uint32_t timer;
 static byte session;
 uint8_t count_off = 0;
 uint8_t time_off = 0;
 uint8_t isOn;
 Stash stash;
-byte EEMEM dataB_addr;
+byte EEMEM isOn_addr;
 
 
 
@@ -55,16 +56,16 @@ static void request () {
 
 
 void setup () {
-//    wdt_enable(WDTO_4S);
     pinMode(PIN_OUT_ON, OUTPUT);
-    isOn = EEPROM.read(1);
     Serial.begin(115200);
+
+    isOn = eeprom_read_byte(&isOn_addr);
     Serial.print("ISON: ");
     Serial.println(isOn);
 
     if((isOn != 0) | (isOn != 1)){
         isOn = 0;
-        EEPROM.write(1, isOn);
+        eeprom_write_byte(&isOn_addr, isOn);
     }
     set_state(isOn);
 
@@ -80,6 +81,7 @@ void setup () {
 //        set_state(isOn);
 //    }
 
+    wdt_enable(WDTO_8S);
     Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0)
@@ -110,14 +112,15 @@ void setup () {
 }
 
 void loop () {
-   ether.packetLoop(ether.packetReceive());
+    ether.packetLoop(ether.packetReceive());
 
     if (millis() > timer) {
         timer = millis() + REQUEST_INTERVAL;
         Serial.println();
 //        ether.browseUrl(PSTR("/api/1/"), " ", website, my_callback);
 
-        Serial.println((time_off * 60) / (REQUEST_INTERVAL / 1000));
+        Serial.print((time_off * 60) / (REQUEST_INTERVAL / 1000));
+        Serial.print("---");
         Serial.println(count_off);
         request();
     }
@@ -148,33 +151,34 @@ void loop () {
             temp = doc["IsOn"];
             time_off = doc["Time"];
             if (temp != isOn){
-                EEPROM.update(1, temp);
+                eeprom_update_byte(&isOn_addr, temp);
                 isOn = temp;
             }
 
             count_off = 0;
-//            Serial.print("Data IsOn: ");
-            Serial.println(isOn);
-//            Serial.print("Time to off: ");
-            Serial.println(time_off);
+            wdt_reset();
         }
 
-
+//        Serial.print("Data IsOn: ");
+        Serial.println(isOn);
+//        Serial.print("Time to off: ");
+        Serial.println(time_off);
         set_state(isOn);
-//        wdt_reset();
-
-
 
     }
 }
 
 void check_timer(){
-    if((time_off * 60) / (REQUEST_INTERVAL / 1000) == count_off){
-        digitalWrite(PIN_OUT_ON, LOW);
-        EEPROM.update(1, isOn);
-//        resetFunc();
+    if((time_off * 60) / (REQUEST_INTERVAL / 1000) <= count_off){
+        if (isOn != 0){
+            isOn = 0;
+            eeprom_update_byte(&isOn_addr, isOn);
+            set_state(isOn);
+        }
+        return;
     }
     count_off++;
+    wdt_reset();
 }
 
 void set_state(uint8_t state){
@@ -187,30 +191,3 @@ void set_state(uint8_t state){
         digitalWrite(PIN_OUT_ON, LOW);
     }
 }
-
-
-//#include <avr/wdt.h>
-//
-//void setup() {
-//    Serial.begin(115200);
-//    Serial.println("Setup..");
-////    Serial.println();
-//    wdt_disable(); // бесполезная строка до которой не доходит выполнение при bootloop
-//
-//    Serial.println("Wait 5 sec..");
-//    delay(5000); // Задержка, чтобы было время перепрошить устройство в случае bootloop
-//    wdt_enable (WDTO_8S); // Для тестов не рекомендуется устанавливать значение менее 8 сек.
-//    Serial.println("Watchdog enabled.");
-//}
-//
-//int timer = 0;
-//
-//void loop(){
-//    // Каждую секунду мигаем светодиодом и значение счетчика пишем в Serial
-//    if(!(millis()%1000)){
-//        timer++;
-//        Serial.println(timer);
-//        digitalWrite(13, digitalRead(13)==1?0:1); delay(1);
-//    }
-////  wdt_reset();
-//}
