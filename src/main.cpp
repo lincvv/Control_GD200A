@@ -11,61 +11,69 @@ const char website[] PROGMEM = "test.itlab.com.ua";
 //void(* resetFunc) (void) = 0;
 
 static uint32_t timer;
-static byte session;
-uint8_t count_off = 0;
-uint8_t time_off = 0;
+static uint8_t count_off = 0;
+static uint8_t etherFailed = 0;
+static uint32_t time_off = 0;
 uint8_t isOn;
 Stash stash;
-byte EEMEM isOn_addr;
+uint8_t isOn_addr = 1;
+uint8_t time_off_addr = 2;
+uint8_t status_off_addr = 3;
 
 
+static void my_callback (byte status, word off, word len) {
+    count_off = 0;
+    Serial.println(">>>");
+    Ethernet::buffer[off+300] = 0;
+    const char* reply = (const char*) Ethernet::buffer + off;
+//    Serial.print(reply);
+    if (strncmp(reply + 9, "200 OK", 6) != 0) {
+        Serial.println(reply);
+    }
+    String resp = reply;
+    resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
 
-static void request () {
-    byte sd = stash.create();
+    Serial.println(resp);
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, resp);
+    if (error) {
+        Serial.println("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        etherFailed = 0;
+        check_timer();
+    } else{
+        wdt_reset();
+        uint8_t temp_isOn;
+        temp_isOn = doc["IsOn"];
+        time_off = doc["Time"];
 
-    stash.print("apikey=");
-    stash.print("ADD YOUR API KEY HERE");
+        if (temp_isOn != isOn){
+            EEPROM.write(isOn_addr, temp_isOn);
+            isOn = temp_isOn;
+            Serial.println("update data");
+        }
+        set_state(isOn);
+    }
 
-    stash.print("&application=");
-    stash.print("arduino");
-
-    stash.print("&event=");
-    stash.print("Ethercard ");
-
-    stash.print("&description=");
-    stash.print("Test message from an Arduino!");
-
-    stash.print("&priority=");
-    stash.print("0");
-
-    stash.save();
-    int stash_size = stash.size();
-
-    Stash::prepare(PSTR("GET /api/1/ HTTP/1.1" "\r\n"
-                        "Host: $F" "\r\n"
-                        "Content-Length: $D" "\r\n"
-                        "Content-Type: application/json" "\r\n"
-                        "\r\n"
-                        "$H"),
-                   website, stash_size, sd);
-    session = ether.tcpSend();
-    check_timer();
-    Serial.println("Send");
-
+    Serial.println(isOn);
+    Serial.println(time_off);
+    Serial.println("...");
 }
 
 
 void setup () {
-    pinMode(PIN_OUT_ON, OUTPUT);
+//    uint8_t mcusr = MCUSR;
     Serial.begin(115200);
+    pinMode(PIN_OUT_ON, OUTPUT);
 
-    isOn = eeprom_read_byte(&isOn_addr);
-    Serial.print("ISON: ");
+    isOn = EEPROM.read(isOn_addr);
+    Serial.print("isOn: ");
     Serial.println(isOn);
 
-    if((isOn != 0) | (isOn != 1)){
+    if((isOn != 0) & (isOn != 1)){
         isOn = 0;
-        eeprom_write_byte(&isOn_addr, isOn);
+        Serial.println("Start ison");
+        EEPROM.write(isOn_addr, isOn);
     }
     set_state(isOn);
 
@@ -81,13 +89,93 @@ void setup () {
 //        set_state(isOn);
 //    }
 
-    wdt_enable(WDTO_8S);
+//    wdt_enable(WDTO_8S);
+    etherInit();
+}
+
+void loop () {
+    ether.packetLoop(ether.packetReceive());
+//    wdt_reset();
+
+    if (millis() > timer) {
+        timer = millis() + REQUEST_INTERVAL;
+        Serial.println();
+
+        ether.browseUrl(PSTR("/api/1/"), " ", website, my_callback);
+        Serial.print("Check Timer: ");
+        check_timer();
+
+    }
+
+//    const char* reply = ether.tcpReply(session);
+//
+//
+//    if (reply != 0) {
+
+}
+
+//#########################################//
+void check_timer(){
+
+    if (count_off != 0){
+        etherFailed = 0;
+        if (isOn != 0){
+            if (count_off != 0){
+                EEPROM.write(status_off_addr, 255);
+                EEPROM.write(time_off_addr, time_off * 60);
+
+            }
+        }
+        etherInit();
+    }
+    count_off++;
+}
+
+void set_state(uint8_t state){
+    if (state == 1)
+    {
+        digitalWrite(PIN_OUT_ON, HIGH);
+    }
+    else
+    {
+        digitalWrite(PIN_OUT_ON, LOW);
+    }
+}
+
+void etherInit(){
+    wdt_disable();
     Serial.println(F("\n[webClient]"));
 
-    if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0)
+    if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
         Serial.println(F("Failed to access Ethernet controller"));
+    }
+    if (EEPROM.read(status_off_addr) == 255){
+        uint8_t temp_off = EEPROM.read(time_off_addr) - 20;
+        if ((temp_off <= 0) & (isOn != 0)){
+            Serial.print("EEprom update ison");
+            Serial.println(isOn);
+            isOn = 0;
+            EEPROM.write(isOn_addr, isOn);
+            EEPROM.write(status_off_addr, 0);
+            set_state(isOn);
+//            count_off = 0;
+//            time_off = 0;
+//            return;
+        }
+        else{
+            EEPROM.write(time_off_addr, temp_off);
+            _delay_ms(10000);
+        }
+        Serial.println(temp_off);
+        Serial.println("---");
+//        Serial.println(time_off * 60 - 8);
+    }
+
+    wdt_enable(WDTO_8S);
     if (!ether.dhcpSetup())
         Serial.println(F("DHCP failed"));
+    wdt_disable();
+//    wdt_enable(WDTO_8S);
 
     ether.printIp("IP:  ", ether.myip);
     ether.printIp("GW:  ", ether.gwip);
@@ -109,85 +197,7 @@ void setup () {
 #endif
 
     ether.printIp("SRV: ", ether.hisip);
-}
+    count_off = 0;
+    EEPROM.write(status_off_addr, 0);
 
-void loop () {
-    ether.packetLoop(ether.packetReceive());
-
-    if (millis() > timer) {
-        timer = millis() + REQUEST_INTERVAL;
-        Serial.println();
-//        ether.browseUrl(PSTR("/api/1/"), " ", website, my_callback);
-
-        Serial.print((time_off * 60) / (REQUEST_INTERVAL / 1000));
-        Serial.print("---");
-        Serial.println(count_off);
-        request();
-    }
-
-    const char* reply = ether.tcpReply(session);
-
-
-    if (reply != 0) {
-        Serial.println("Got a response!");
-//        Serial.println(reply);
-
-        if (strncmp(reply + 9, "200 OK", 6) != 0) {
-            Serial.println(reply);
-        }
-
-        String resp = reply;
-        resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
-
-        Serial.println(resp);
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, resp);
-        if (error) {
-            Serial.println("deserializeJson() failed: ");
-            Serial.println(error.c_str());
-            check_timer();
-        } else{
-            uint8_t temp;
-            temp = doc["IsOn"];
-            time_off = doc["Time"];
-            if (temp != isOn){
-                eeprom_update_byte(&isOn_addr, temp);
-                isOn = temp;
-            }
-
-            count_off = 0;
-            wdt_reset();
-        }
-
-//        Serial.print("Data IsOn: ");
-        Serial.println(isOn);
-//        Serial.print("Time to off: ");
-        Serial.println(time_off);
-        set_state(isOn);
-
-    }
-}
-
-void check_timer(){
-    if((time_off * 60) / (REQUEST_INTERVAL / 1000) <= count_off){
-        if (isOn != 0){
-            isOn = 0;
-            eeprom_update_byte(&isOn_addr, isOn);
-            set_state(isOn);
-        }
-        return;
-    }
-    count_off++;
-    wdt_reset();
-}
-
-void set_state(uint8_t state){
-    if (state == 1)
-    {
-        digitalWrite(PIN_OUT_ON, HIGH);
-    }
-    else
-    {
-        digitalWrite(PIN_OUT_ON, LOW);
-    }
 }

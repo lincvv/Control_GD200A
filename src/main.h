@@ -9,13 +9,15 @@
 #include <ArduinoJson.h>
 #include <EtherCard.h>
 #include <avr/wdt.h>
-#include <avr/eeprom.h>
-//#include <EEPROM.h>
+//#include <avr/eeprom.h>
+#include <EEPROM.h>
 
 #define REQUEST_INTERVAL 5000
 
 
 void check_timer();
 void set_state(uint8_t state);
+void etherInit();
+
 
 #endif //LONOFF_MAIN_H
