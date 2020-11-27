@@ -12,10 +12,10 @@ const char website[] PROGMEM = "test.itlab.com.ua";
 
 static uint32_t timer;
 static uint8_t count_off = 0;
-static uint8_t etherFailed = 0;
+//static uint8_t etherFailed = 0;
 static uint32_t time_off = 0;
 uint8_t isOn;
-Stash stash;
+//Stash stash;
 uint8_t isOn_addr = 1;
 uint8_t time_off_addr = 2;
 uint8_t status_off_addr = 3;
@@ -39,7 +39,6 @@ static void my_callback (byte status, word off, word len) {
     if (error) {
         Serial.println("deserializeJson() failed: ");
         Serial.println(error.c_str());
-        etherFailed = 0;
         check_timer();
     } else{
         wdt_reset();
@@ -77,19 +76,6 @@ void setup () {
     }
     set_state(isOn);
 
-//    if(MCUSR & (1 << PORF)) { // POR
-//        Serial.println("POR");
-//        digitalWrite(PIN_OUT_ON, LOW);
-//    } else if (MCUSR & (1 << EXTRF)) { // External Reset
-//        Serial.println("External Reset");
-//        set_state(isOn);
-//
-//    } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
-//        Serial.println("Watchdog Reset");
-//        set_state(isOn);
-//    }
-
-//    wdt_enable(WDTO_8S);
     etherInit();
 }
 
@@ -118,12 +104,10 @@ void loop () {
 void check_timer(){
 
     if (count_off != 0){
-        etherFailed = 0;
         if (isOn != 0){
             if (count_off != 0){
                 EEPROM.write(status_off_addr, 255);
                 EEPROM.write(time_off_addr, time_off * 60);
-
             }
         }
         etherInit();
@@ -149,26 +133,27 @@ void etherInit(){
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
         Serial.println(F("Failed to access Ethernet controller"));
     }
-    if (EEPROM.read(status_off_addr) == 255){
-        uint8_t temp_off = EEPROM.read(time_off_addr) - 20;
-        if ((temp_off <= 0) & (isOn != 0)){
-            Serial.print("EEprom update ison");
-            Serial.println(isOn);
-            isOn = 0;
-            EEPROM.write(isOn_addr, isOn);
-            EEPROM.write(status_off_addr, 0);
-            set_state(isOn);
-//            count_off = 0;
-//            time_off = 0;
-//            return;
+    if (isOn != 0){
+        if (EEPROM.read(status_off_addr) == 255){
+            time_off = EEPROM.read(time_off_addr) - 20;
+            if (time_off <= 0){
+                Serial.print("EEprom update ison");
+                Serial.println(isOn);
+                isOn = 0;
+                EEPROM.write(isOn_addr, isOn);
+                EEPROM.write(status_off_addr, 0);
+                set_state(isOn);
+        //            count_off = 0;
+        //            time_off = 0;
+        //            return;
+            }
+            else{
+                EEPROM.write(time_off_addr, temp_off);
+                _delay_ms(10000);
+            }
+            Serial.println(temp_off);
+            Serial.println("---");
         }
-        else{
-            EEPROM.write(time_off_addr, temp_off);
-            _delay_ms(10000);
-        }
-        Serial.println(temp_off);
-        Serial.println("---");
-//        Serial.println(time_off * 60 - 8);
     }
 
     wdt_enable(WDTO_8S);
@@ -201,3 +186,16 @@ void etherInit(){
     EEPROM.write(status_off_addr, 0);
 
 }
+
+
+//    if(MCUSR & (1 << PORF)) { // POR
+//        Serial.println("POR");
+//        digitalWrite(PIN_OUT_ON, LOW);
+//    } else if (MCUSR & (1 << EXTRF)) { // External Reset
+//        Serial.println("External Reset");
+//        set_state(isOn);
+//
+//    } else if (MCUSR & (1 << WDRF)){ // Watchdog Reset
+//        Serial.println("Watchdog Reset");
+//        set_state(isOn);
+//    }
