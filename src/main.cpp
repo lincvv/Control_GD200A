@@ -81,28 +81,22 @@ void setup () {
 
 void loop () {
     ether.packetLoop(ether.packetReceive());
-//    wdt_reset();
 
     if (millis() > timer) {
         timer = millis() + REQUEST_INTERVAL;
         Serial.println();
-
         ether.browseUrl(PSTR("/api/1/"), " ", website, my_callback);
-        Serial.print("Check Timer: ");
         check_timer();
-
     }
 }
 
 //#########################################//
 void check_timer(){
-
+    Serial.println("Check count off");
     if (count_off != 0){
         if (isOn != 0){
-            if (count_off != 0){
-                EEPROM.write(status_off_addr, 255);
-                EEPROM.write(time_off_addr, time_off * 60);
-            }
+            EEPROM.write(status_off_addr, 255);
+            EEPROM.write(time_off_addr, time_off * 60);
         }
         etherInit();
     }
@@ -128,24 +122,25 @@ void etherInit(){
         Serial.println(F("Failed to access Ethernet controller"));
     }
     if (isOn != 0){
+        Serial.println("Check status connect");
         if (EEPROM.read(status_off_addr) == 255){
-            time_off = EEPROM.read(time_off_addr) - 20;
+            time_off = EEPROM.read(time_off_addr) - 60;
+            Serial.println("Check timer");
             if (time_off <= 0){
-                Serial.print("EEprom update ison");
-                Serial.println(isOn);
                 isOn = 0;
+                Serial.print("EEPROM update isOn: ");
+                Serial.println(isOn);
                 EEPROM.write(isOn_addr, isOn);
                 EEPROM.write(status_off_addr, 0);
                 set_state(isOn);
-        //            count_off = 0;
+                count_off = 0;
         //            time_off = 0;
-        //            return;
             }
             else{
-                EEPROM.write(time_off_addr, temp_off);
-                _delay_ms(10000);
+                EEPROM.write(time_off_addr, time_off);
+                _delay_ms(50000);
             }
-            Serial.println(temp_off);
+            Serial.println(time_off);
             Serial.println("---");
         }
     }
