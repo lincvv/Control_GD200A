@@ -92,12 +92,6 @@ void loop () {
         check_timer();
 
     }
-
-//    const char* reply = ether.tcpReply(session);
-//
-//
-//    if (reply != 0) {
-
 }
 
 //#########################################//
