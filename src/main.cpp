@@ -12,19 +12,18 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[500];
 const char website[] PROGMEM = "test.itlab.com.ua";
 
-//void(* resetFunc) (void) = 0;
-
 static uint32_t timer;
 static uint8_t regs_time_off = 0;
 static uint32_t time_off = 0;
 uint8_t isOn;
 uint32_t timer_off_s;
 uint8_t mcusr_f;
-uint8_t isOn_addr = 1;
+//uint8_t isOn_addr = 1;
 //Stash stash;
 //uint32_t time_off_addr = 2;
 //uint8_t status_off_addr = 3;
 
+//void(* resetFunc) (void) = 0;
 /************************************************************
 [*] code
 *************************************************************/
@@ -63,8 +62,8 @@ void loop () {
 void check_timer(){
     Serial.print("[*] State isOn ==> ");
     Serial.println(isOn);
-    Serial.print("[*] Count off ==> ");
-    Serial.println(regs_time_off);
+    Serial.print("[*] Timer sec ==> ");
+    Serial.println(regs_time_off * 5);
     if (regs_time_off != 0){
         if (isOn != 0){
             Serial.println("[*] Check timer >>>");
@@ -79,17 +78,13 @@ void check_timer(){
                 if (regs_time_off == 12){
                     time_off--;
                     regs_time_off = 0;
-                    Serial.print("[*] Current timer ==> ");
+                    Serial.print("[*] Current timer min ==> ");
                     Serial.println(time_off);
                 }else{
                     regs_time_off++;
                     Serial.println("[*] ...");
                     return;
                 }
-//                EEPROM.write(time_off_addr, time_off);
-//                Serial.println("[*] Delay");
-//                _delay_ms(60000);
-//                time_off--;
             }
         } else{
             regs_time_off = 0;
