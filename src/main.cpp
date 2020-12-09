@@ -16,8 +16,9 @@ static uint32_t timer;
 static uint8_t regs_time_off = 0;
 static uint32_t time_off = 0;
 uint8_t isOn;
-uint32_t timer_off_s;
 uint8_t mcusr_f;
+uint8_t state_isOn __attribute__ ((section (".noinit")));
+//uint32_t timer_off_s;
 //uint8_t isOn_addr = 1;
 //Stash stash;
 //uint32_t time_off_addr = 2;
@@ -35,11 +36,17 @@ void setup () {
     Serial.begin(115200);
     pinMode(PIN_OUT_ON, OUTPUT);
 
-    if (mcusr_f & (1 << EXTRF) || mcusr_f & (1 << PORF) || mcusr_f & (1 << WDRF)){
+    if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
         isOn = 0;
-        Serial.println("[*] Reboot ==> EXTRF OR WDRF");
+        Serial.println("[*] Reboot ==> EXTRF");
+        state_isOn = isOn;
         set_state(isOn);;
     }
+    if (mcusr_f & _BV(WDRF)){
+        Serial.println("[*] Reboot ==> WDRF");
+        isOn = state_isOn;
+    }
+    wdt_enable(WDTO_8S);
     etherInit();
 }
 
@@ -52,6 +59,7 @@ void loop () {
         Serial.println("[*] GET REQUEST");
         ether.browseUrl(PSTR("/api/1/"), " ", website, callback_response);
         check_timer();
+        wdt_reset();
     }
 }
 
@@ -106,7 +114,7 @@ void set_state(uint8_t state){
 }
 
 void etherInit(){
-    wdt_disable();
+//    wdt_disable();
     Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
@@ -135,6 +143,7 @@ void etherInit(){
 #endif
 
     ether.printIp("[*] SRV: ", ether.hisip);
+    wdt_reset();
 
 }
 
@@ -153,8 +162,8 @@ static void callback_response(byte status, word off, word len){
     String resp = reply;
     resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
 
-    Serial.print("[*] ");
-    Serial.println(resp);
+//    Serial.print("[*] ");
+//    Serial.println(resp);
     StaticJsonDocument<200> doc;
     DeserializationError error = deserializeJson(doc, resp);
     if (error) {
@@ -162,10 +171,11 @@ static void callback_response(byte status, word off, word len){
         Serial.println(error.c_str());
 //        check_timer();
     } else{
-        wdt_reset();
+//        wdt_reset();
         regs_time_off = 0;
         isOn = doc["IsOn"];
         time_off = doc["Time"];
+        state_isOn = isOn;
         set_state(isOn);
     }
 
