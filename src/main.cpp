@@ -34,7 +34,8 @@ void setup () {
     mcusr_f = MCUSR;
     MCUSR = 0;
     Serial.begin(115200);
-    pinMode(PIN_OUT_ON, OUTPUT);
+    pinMode(PIN_ON_INV, OUTPUT);
+    pinMode(PIN_OFF_INV, OUTPUT);
 
     if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
         isOn = 0;
@@ -105,11 +106,15 @@ void check_timer(){
 void set_state(uint8_t state){
     if (state == 1)
     {
-        digitalWrite(PIN_OUT_ON, HIGH);
+        digitalWrite(PIN_ON_INV, HIGH);
+        delay(1000);
+        digitalWrite(PIN_ON_INV, LOW);
     }
     else
     {
-        digitalWrite(PIN_OUT_ON, LOW);
+        digitalWrite(PIN_OFF_INV, HIGH);
+        delay(1000);
+        digitalWrite(PIN_OFF_INV, LOW);
     }
 }
 
@@ -175,8 +180,13 @@ static void callback_response(byte status, word off, word len){
         regs_time_off = 0;
         isOn = doc["IsOn"];
         time_off = doc["Time"];
-        state_isOn = isOn;
-        set_state(isOn);
+//        state_isOn = isOn;
+        if (state_isOn != isOn){
+            set_state(isOn);
+            Serial.print("[*] isOn: ");
+            Serial.println(isOn);
+            state_isOn = isOn;
+        }
     }
 
     Serial.print("[*] State isOn/Time ==> ");
