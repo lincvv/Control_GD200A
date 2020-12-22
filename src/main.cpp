@@ -31,7 +31,7 @@ void setup () {
     MCUSR = 0;
     Serial.begin(115200);
     pinMode(PIN_ON_INV, OUTPUT);
-    pinMode(PIN_ON_INV, OUTPUT);
+    pinMode(PIN_OFF_INV, OUTPUT);
     pinMode(PIN_LOOP_CONNECT, OUTPUT);
 
     if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){

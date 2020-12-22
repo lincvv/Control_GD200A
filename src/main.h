@@ -14,7 +14,7 @@
 
 #define REQUEST_INTERVAL 5000
 #define PIN_ON_INV 4
-#define PIN_OFF_INV 5
+#define PIN_OFF_INV 7
 #define PIN_LOOP_CONNECT 6
 
 static void callback_response(byte status, word off, word len);
