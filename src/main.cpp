@@ -18,11 +18,7 @@ static uint32_t time_off = 0;
 uint8_t isOn;
 uint8_t mcusr_f;
 uint8_t state_isOn __attribute__ ((section (".noinit")));
-//uint32_t timer_off_s;
-//uint8_t isOn_addr = 1;
 //Stash stash;
-//uint32_t time_off_addr = 2;
-//uint8_t status_off_addr = 3;
 
 //void(* resetFunc) (void) = 0;
 /************************************************************
@@ -35,7 +31,8 @@ void setup () {
     MCUSR = 0;
     Serial.begin(115200);
     pinMode(PIN_ON_INV, OUTPUT);
-    pinMode(PIN_OFF_INV, OUTPUT);
+    pinMode(PIN_ON_INV, OUTPUT);
+    pinMode(PIN_LOOP_CONNECT, OUTPUT);
 
     if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
         isOn = 0;
@@ -56,10 +53,11 @@ void loop () {
 
     if (millis() > timer) {
         timer = millis() + REQUEST_INTERVAL;
-        Serial.println();
-        Serial.println("[*] GET REQUEST");
+//        Serial.println();
+//        Serial.println("[*] GET REQUEST");
         ether.browseUrl(PSTR("/api/1/"), " ", website, callback_response);
         check_timer();
+        digitalWrite(PIN_LOOP_CONNECT, !digitalRead(PIN_LOOP_CONNECT));
         wdt_reset();
     }
 }
@@ -69,17 +67,13 @@ void loop () {
 *************************************************************/
 
 void check_timer(){
-    Serial.print("[*] State isOn ==> ");
-    Serial.println(isOn);
-    Serial.print("[*] Timer sec ==> ");
-    Serial.println(regs_time_off * 5);
-    if (regs_time_off != 0){
+    if (regs_time_off > 2){
         if (isOn != 0){
             Serial.println("[*] Check timer >>>");
             if(time_off <= 0){
                 isOn = 0;
-//                EEPROM.write(isOn_addr, isOn);
                 set_state(isOn);
+                state_isOn = isOn;
                 regs_time_off = 0;
                 Serial.println("[*] STATE OFF");
                 return;
@@ -97,6 +91,7 @@ void check_timer(){
             }
         } else{
             regs_time_off = 0;
+//            wdt_enable(WDTO_15MS);
             return;
         }
     }
@@ -119,7 +114,6 @@ void set_state(uint8_t state){
 }
 
 void etherInit(){
-//    wdt_disable();
     Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
@@ -148,6 +142,7 @@ void etherInit(){
 #endif
 
     ether.printIp("[*] SRV: ", ether.hisip);
+    digitalWrite(PIN_LOOP_CONNECT, HIGH );
     wdt_reset();
 
 }
@@ -158,7 +153,7 @@ static void callback_response(byte status, word off, word len){
     Serial.println("[*] RESPONSE");
     Ethernet::buffer[off+300] = 0;
     const char* reply = (const char*) Ethernet::buffer + off;
-//    Serial.print(reply);
+
     if (strncmp(reply + 9, "200 OK", 6) != 0) {
         Serial.print("[*] Status code ==> ");
         Serial.println(reply);
@@ -167,24 +162,20 @@ static void callback_response(byte status, word off, word len){
     String resp = reply;
     resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
 
-//    Serial.print("[*] ");
-//    Serial.println(resp);
     StaticJsonDocument<200> doc;
     DeserializationError error = deserializeJson(doc, resp);
     if (error) {
         Serial.println("[*] deserializeJson() failed: ");
         Serial.println(error.c_str());
-//        check_timer();
+        Serial.print("[*] ");
+        Serial.println(resp);
+        return;
     } else{
-//        wdt_reset();
         regs_time_off = 0;
         isOn = doc["IsOn"];
         time_off = doc["Time"];
-//        state_isOn = isOn;
         if (state_isOn != isOn){
             set_state(isOn);
-            Serial.print("[*] isOn: ");
-            Serial.println(isOn);
             state_isOn = isOn;
         }
     }
