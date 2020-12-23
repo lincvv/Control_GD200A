@@ -13,7 +13,7 @@ byte Ethernet::buffer[500];
 const char website[] PROGMEM = "test.itlab.com.ua";
 
 static uint32_t timer;
-static uint8_t regs_time_off = 0;
+static uint16_t regs_time_off = 0;
 static uint32_t time_off = 0;
 uint8_t isOn;
 uint8_t mcusr_f;
@@ -67,34 +67,26 @@ void loop () {
 *************************************************************/
 
 void check_timer(){
-    if (regs_time_off > 2){
-        if (isOn != 0){
-            Serial.println("[*] Check timer >>>");
+    if ((regs_time_off > 2) && (isOn != 0)){
+        Serial.println("[*] Check timer >>>");
+        if (regs_time_off == 12){
+            time_off--;
+            Serial.print("[*] Current timer min ==> ");
+            Serial.println(time_off);
             if(time_off <= 0){
                 isOn = 0;
                 set_state(isOn);
                 state_isOn = isOn;
-                regs_time_off = 0;
                 Serial.println("[*] STATE OFF");
-                return;
-            } else{
-                if (regs_time_off == 12){
-                    time_off--;
-                    regs_time_off = 0;
-                    Serial.print("[*] Current timer min ==> ");
-                    Serial.println(time_off);
-                }else{
-                    regs_time_off++;
-                    Serial.println("[*] ...");
-                    return;
-                }
             }
-        } else{
             regs_time_off = 0;
-//            wdt_enable(WDTO_15MS);
             return;
         }
-    }
+    } else if((regs_time_off >= 120)){
+            wdt_enable(WDTO_15MS);
+            delay(20);
+        }
+//    Serial.println(regs_time_off);
     regs_time_off++;
 }
 
