@@ -1,24 +1,20 @@
-
-
 /************************************************************
 [*] include
 *************************************************************/
 #include "main.h"
-
 /************************************************************
-[*] variable
+[*] init variables
 *************************************************************/
-static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
-byte Ethernet::buffer[500];
-const char website[] PROGMEM = "test.itlab.com.ua";
-
+extern byte session;
 static uint32_t timer;
-static uint16_t regs_time_off = 0;
-static uint32_t time_off = 0;
-uint8_t isOn;
-uint8_t mcusr_f;
-uint8_t state_isOn __attribute__ ((section (".noinit")));
-//Stash stash;
+uint8_t isOn __attribute__ ((section (".noinit")));
+uint8_t mcusr_f __attribute__ ((section (".noinit")));
+static uint16_t time_off __attribute__ ((section (".noinit")));
+static uint16_t timer_time_off __attribute__ ((section (".noinit")));
+uint8_t count_notfound __attribute__ ((section (".noinit")));
+uint8_t count_ether_failed __attribute__ ((section (".noinit")));
+//SoftwareSerial master(PIN_RX, PIN_TX);
+ModbusMaster node;
 
 //void(* resetFunc) (void) = 0;
 /************************************************************
@@ -26,38 +22,62 @@ uint8_t state_isOn __attribute__ ((section (".noinit")));
 *************************************************************/
 
 void setup () {
-    wdt_disable();
     mcusr_f = MCUSR;
     MCUSR = 0;
-    Serial.begin(115200);
-    pinMode(PIN_ON_INV, OUTPUT);
-    pinMode(PIN_OFF_INV, OUTPUT);
-    pinMode(PIN_LOOP_CONNECT, OUTPUT);
+    wdt_disable();
+    initIO();
 
     if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
+        count_notfound = 0;
+        count_ether_failed = 0;
+        timer_time_off = 0;
+        time_off = 0;
         isOn = 0;
-        Serial.println("[*] Reboot ==> EXTRF");
-        state_isOn = isOn;
-        set_state(isOn);;
+//        Serial.println("[*] Reboot ==> EXTRF");
+        set_state(isOn);
+
     }
     if (mcusr_f & _BV(WDRF)){
-        Serial.println("[*] Reboot ==> WDRF");
-        isOn = state_isOn;
+        Serial.println(F("[*] Reboot ==> WDRF"));
     }
-    wdt_enable(WDTO_8S);
+
+    wdt_enable(WDTO_4S);
+    check_timer();
     etherInit();
+    wdt_enable(WDTO_8S);
+    digitalWrite(PIN_LOOP_CONNECT, HIGH );
+
 }
+
+/************************************************************
+[*] loop
+*************************************************************/
 
 void loop () {
     ether.packetLoop(ether.packetReceive());
 
     if (millis() > timer) {
+        wdt_reset();
         timer = millis() + REQUEST_INTERVAL;
-//        Serial.println();
-//        Serial.println("[*] GET REQUEST");
-        ether.browseUrl(PSTR("/api/1/"), " ", website, callback_response);
-        check_timer();
+        Serial.println(count_notfound);
+//        Serial.println(count_ether_failed);
+        POSTRequest(1);
         digitalWrite(PIN_LOOP_CONNECT, !digitalRead(PIN_LOOP_CONNECT));
+        check_timer();
+    }
+
+    const char* reply = ether.tcpReply(session);
+
+    if (reply != 0) {
+        if (strncmp(reply + 9, "201 Created", 11) == 0){
+            Serial.println(F("[*] 201"));
+            timer_time_off = 0;
+            delay(30);
+            ether.browseUrl(PSTR("/api/1/"), " ", website, callbackGETResponse);
+        } else{
+            Serial.println(reply);
+            count_notfound++;
+        }
         wdt_reset();
     }
 }
@@ -66,115 +86,163 @@ void loop () {
 [*] functions
 *************************************************************/
 
-void check_timer(){
-    if ((regs_time_off > 2) && (isOn != 0)){
-        Serial.println("[*] Check timer >>>");
-        if (regs_time_off == 12){
+static void check_timer(){
+    if (isOn != 0){
+        if (timer_time_off == 12){
             time_off--;
-            Serial.print("[*] Current timer min ==> ");
-            Serial.println(time_off);
-            if(time_off <= 0){
+            Serial.printf(F("[*] timer min ==> %d\n"), time_off);
+            if(time_off == 0){
+                time_off = 0;
                 isOn = 0;
                 set_state(isOn);
-                state_isOn = isOn;
-                Serial.println("[*] STATE OFF");
             }
-            regs_time_off = 0;
-            return;
+            reConnect();
         }
-    } else if((regs_time_off >= 120)){
-            wdt_enable(WDTO_15MS);
-            delay(20);
-        }
-//    Serial.println(regs_time_off);
-    regs_time_off++;
+    }else if((timer_time_off >= 6)){ //если нет сети через 30 сек. сделать reset
+        reConnect();
+    }
+//    Serial.println(timer_time_off);
+    timer_time_off++;
+    wdt_reset();
 }
 
-void set_state(uint8_t state){
+static void reConnect(){
+    count_ether_failed++;
+    timer_time_off = 0;
+    wdt_enable(WDTO_15MS);
+    delay(20);
+}
+
+static void set_state(uint8_t state){
+    wdt_reset();
+    Serial.println(F("set_state"));
     if (state == 1)
     {
-        digitalWrite(PIN_ON_INV, HIGH);
-        delay(1000);
-        digitalWrite(PIN_ON_INV, LOW);
+//        node.writeSingleRegister(0x40001, 1);
+        node.readHoldingRegisters(0x2100, 01);
+//        digitalWrite(PIN_ON_INV, HIGH);
+//        delay(1000);
+//        digitalWrite(PIN_ON_INV, LOW);
     }
     else
     {
-        digitalWrite(PIN_OFF_INV, HIGH);
-        delay(1000);
-        digitalWrite(PIN_OFF_INV, LOW);
+        node.readHoldingRegisters(0x2100, 01);
+
+//        digitalWrite(PIN_OFF_INV, HIGH);
+//        delay(1000);
+//        digitalWrite(PIN_OFF_INV, LOW);
     }
-}
-
-void etherInit(){
-    Serial.println(F("\n[webClient]"));
-
-    if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
-        Serial.println(F("[*] Failed to access Ethernet controller"));
-    }
-    if (!ether.dhcpSetup())
-        Serial.println(F("[*] DHCP failed"));
-
-    ether.printIp("[*] IP:  ", ether.myip);
-    ether.printIp("[*] GW:  ", ether.gwip);
-    ether.printIp("[*] DNS: ", ether.dnsip);
-
-#if 1
-    // use DNS to resolve the website's IP address
-    if (!ether.dnsLookup(website))
-        Serial.println("[*] DNS failed");
-#elif 2
-    // if website is a string containing an IP address instead of a domain name,
-  // then use it directly. Note: the string can not be in PROGMEM.
-  char websiteIP[] = "192.168.1.1";
-  ether.parseIp(ether.hisip, websiteIP);
-#else
-  // or provide a numeric IP address instead of a string
-  byte hisip[] = { 192,168,1,1 };
-  ether.copyIp(ether.hisip, hisip);
-#endif
-
-    ether.printIp("[*] SRV: ", ether.hisip);
-    digitalWrite(PIN_LOOP_CONNECT, HIGH );
     wdt_reset();
-
 }
 
-static void callback_response(byte status, word off, word len){
+String getValue(const String* data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    unsigned int maxIndex = data->length() - 1;
 
-    Serial.println();
-    Serial.println("[*] RESPONSE");
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data->charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data->substring(strIndex[0], strIndex[1]) : "";
+}
+
+static void parseResp(String* res_data){
+    wdt_reset();
+    timer_time_off = 0;
+    *res_data = res_data->substring(res_data->indexOf('{') , res_data->lastIndexOf('}') + 1);
+    String temp_json = res_data->substring(res_data->indexOf('{') + 1, res_data->lastIndexOf(','));
+    temp_json = getValue(&temp_json, ':', 1);
+    uint8_t data_isOn = temp_json.toInt();
+    if (isOn != data_isOn){
+        isOn = data_isOn;
+        set_state(isOn);
+    }
+    temp_json = res_data->substring(res_data->indexOf(',') + 1, res_data->lastIndexOf('}'));
+    temp_json = getValue(&temp_json, ':', 1);
+    time_off = temp_json.toInt();
+}
+
+static void initIO(){
+//    master.begin(115200);
+    Serial.begin(9600);
+    node.begin(1, Serial);
+    node.preTransmission(preTransmission);
+    node.postTransmission(postTransmission);
+    pinMode(PIN_RE_DE, OUTPUT);
+//    pinMode(PIN_ON_INV, OUTPUT);
+//    pinMode(PIN_OFF_INV, OUTPUT);
+    pinMode(PIN_LOOP_CONNECT, OUTPUT);
+    digitalWrite(PIN_RE_DE, LOW);
+}
+
+/************************************************************
+[*] callbacks
+*************************************************************/
+static void callbackGETResponse(byte status, word off, word len){
+
+//    Serial.println("[*] GET RESPONSE");
     Ethernet::buffer[off+300] = 0;
     const char* reply = (const char*) Ethernet::buffer + off;
 
     if (strncmp(reply + 9, "200 OK", 6) != 0) {
-        Serial.print("[*] Status code ==> ");
+        count_notfound++;
         Serial.println(reply);
         return;
     }
+
     String resp = reply;
-    resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
-
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, resp);
-    if (error) {
-        Serial.println("[*] deserializeJson() failed: ");
-        Serial.println(error.c_str());
-        Serial.print("[*] ");
-        Serial.println(resp);
-        return;
-    } else{
-        regs_time_off = 0;
-        isOn = doc["IsOn"];
-        time_off = doc["Time"];
-        if (state_isOn != isOn){
-            set_state(isOn);
-            state_isOn = isOn;
-        }
-    }
-
-    Serial.print("[*] State isOn/Time ==> ");
-    Serial.print(isOn);
-    Serial.print("/");
-    Serial.println(time_off);
-    Serial.println("[*] END RESPONSE");
+    parseResp(&resp);
+    Serial.printf(F("\nisOn: %d\n"), isOn);
+    wdt_reset();
 }
+
+void preTransmission()
+{
+    digitalWrite(PIN_RE_DE, HIGH);
+}
+
+void postTransmission()
+{
+    digitalWrite(PIN_RE_DE, LOW);
+}
+
+/************************************************************
+[*]
+*************************************************************/
+
+//    const char* postDataChar = "id=1";
+//    ether.httpPost(PSTR("/api/val/"), website, NULL,
+//                   postDataChar,
+//                   POSTCallbackResp);
+
+//static void POSTCallbackResp(byte status, word off, word len){
+//    Ethernet::buffer[off+300] = 0;
+//    const char* reply = (const char*) Ethernet::buffer + off;
+//    Serial.println(reply);
+//}
+
+//    String resp = reply;
+//    resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
+
+//    StaticJsonDocument<200> doc;
+//    DeserializationError error = deserializeJson(doc, reply);
+//    if (error) {
+//        Serial.println("[*] deserializeJson() failed: ");
+//        Serial.println(error.c_str());
+//        Serial.print("[*] ");
+//        Serial.println(resp);
+//        return;
+//    } else{
+//        timer_time_off = 0;
+//        isOn = doc["IsOn"];
+//        time_off = doc["Time"];
+//        if (state_isOn != isOn){
+//            set_state(isOn);
+//            state_isOn = isOn;
+//        }
+//    }
