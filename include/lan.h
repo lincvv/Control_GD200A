@@ -10,6 +10,6 @@
 const char website[] PROGMEM = "test.itlab.com.ua";
 
 void etherInit();
-void POSTRequest(int id);
+void POSTRequest(int id, uint8_t ison);
 void GetStatus();
 #endif //LONOFF_LAN_H

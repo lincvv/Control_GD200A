@@ -13,7 +13,7 @@ static uint16_t time_off __attribute__ ((section (".noinit")));
 static uint16_t timer_time_off __attribute__ ((section (".noinit")));
 uint8_t count_notfound __attribute__ ((section (".noinit")));
 uint8_t count_ether_failed __attribute__ ((section (".noinit")));
-//SoftwareSerial master(PIN_RX, PIN_TX);
+SoftwareSerial master(PIN_RX, PIN_TX);
 ModbusMaster node;
 
 //void(* resetFunc) (void) = 0;
@@ -38,7 +38,7 @@ void setup () {
 
     }
     if (mcusr_f & _BV(WDRF)){
-        Serial.println(F("[*] Reboot ==> WDRF"));
+        master.println(F("[*] Reboot ==> WDRF"));
     }
 
     wdt_enable(WDTO_4S);
@@ -59,9 +59,15 @@ void loop () {
     if (millis() > timer) {
         wdt_reset();
         timer = millis() + REQUEST_INTERVAL;
-        Serial.println(count_notfound);
+        master.println(count_notfound);
 //        Serial.println(count_ether_failed);
-        POSTRequest(1);
+        uint8_t res;
+        res = node.readHoldingRegisters(0x2100, 01);
+        if(res == node.ku8MBSuccess){
+            res = node.getResponseBuffer(0);
+            }
+        wdt_reset();
+        POSTRequest(1, res);
         digitalWrite(PIN_LOOP_CONNECT, !digitalRead(PIN_LOOP_CONNECT));
         check_timer();
     }
@@ -70,12 +76,12 @@ void loop () {
 
     if (reply != 0) {
         if (strncmp(reply + 9, "201 Created", 11) == 0){
-            Serial.println(F("[*] 201"));
+            master.println(F("[*] 201"));
             timer_time_off = 0;
             delay(30);
             ether.browseUrl(PSTR("/api/1/"), " ", website, callbackGETResponse);
         } else{
-            Serial.println(reply);
+            master.println(reply);
             count_notfound++;
         }
         wdt_reset();
@@ -90,7 +96,7 @@ static void check_timer(){
     if (isOn != 0){
         if (timer_time_off == 12){
             time_off--;
-            Serial.printf(F("[*] timer min ==> %d\n"), time_off);
+            master.printf(F("[*] timer min ==> %d\n"), time_off);
             if(time_off == 0){
                 time_off = 0;
                 isOn = 0;
@@ -115,19 +121,19 @@ static void reConnect(){
 
 static void set_state(uint8_t state){
     wdt_reset();
-    Serial.println(F("set_state"));
+    master.println(F("set_state"));
     if (state == 1)
     {
-//        node.writeSingleRegister(0x40001, 1);
-        node.readHoldingRegisters(0x2100, 01);
+//        node.readHoldingRegisters(0x2100, 01);
+        node.writeSingleRegister(0x2000, 0x0001);
 //        digitalWrite(PIN_ON_INV, HIGH);
 //        delay(1000);
 //        digitalWrite(PIN_ON_INV, LOW);
     }
     else
     {
-        node.readHoldingRegisters(0x2100, 01);
-
+//        node.readHoldingRegisters(0x2100, 01);
+        node.writeSingleRegister(0x2000, 0x0005);
 //        digitalWrite(PIN_OFF_INV, HIGH);
 //        delay(1000);
 //        digitalWrite(PIN_OFF_INV, LOW);
@@ -168,14 +174,14 @@ static void parseResp(String* res_data){
 }
 
 static void initIO(){
-//    master.begin(115200);
+    master.begin(9600);
     Serial.begin(9600);
     node.begin(1, Serial);
     node.preTransmission(preTransmission);
     node.postTransmission(postTransmission);
     pinMode(PIN_RE_DE, OUTPUT);
-//    pinMode(PIN_ON_INV, OUTPUT);
-//    pinMode(PIN_OFF_INV, OUTPUT);
+    pinMode(PIN_ON_INV, OUTPUT);
+    pinMode(PIN_OFF_INV, OUTPUT);
     pinMode(PIN_LOOP_CONNECT, OUTPUT);
     digitalWrite(PIN_RE_DE, LOW);
 }
@@ -191,13 +197,13 @@ static void callbackGETResponse(byte status, word off, word len){
 
     if (strncmp(reply + 9, "200 OK", 6) != 0) {
         count_notfound++;
-        Serial.println(reply);
+        master.println(reply);
         return;
     }
 
     String resp = reply;
     parseResp(&resp);
-    Serial.printf(F("\nisOn: %d\n"), isOn);
+    master.printf(F("\nisOn: %d\n"), isOn);
     wdt_reset();
 }
 

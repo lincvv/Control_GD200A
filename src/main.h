@@ -16,8 +16,8 @@
 #define REQUEST_INTERVAL 5000
 //#define PIN_ON_INV 4
 //#define PIN_OFF_INV 7
-#define PIN_RX 2
-#define PIN_TX 3
+#define PIN_RX 8 //2
+#define PIN_TX 9 //3
 #define PIN_RE_DE 5
 #define PIN_LOOP_CONNECT 6
 

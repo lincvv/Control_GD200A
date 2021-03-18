@@ -9,6 +9,7 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[400];
 byte session;
 
+
 /************************************************************
 [*] functions
 *************************************************************/
@@ -17,10 +18,10 @@ void etherInit(){
 //    Serial.println(F("\n[webClient]"));
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
-        Serial.println(F("[*] Failed Ethernet controller"));
+//        Serial.println(F("[*] Failed Ethernet controller"));
     }
     if (!ether.dhcpSetup())
-        Serial.println(F("[*] DHCP failed"));
+//        Serial.println(F("[*] DHCP failed"));
 
     ether.printIp(F("[*] IP:  "), ether.myip);
 //    ether.printIp("[*] GW:  ", ether.gwip);
@@ -29,7 +30,7 @@ void etherInit(){
 #if 1
     // use DNS to resolve the website's IP address
     if (!ether.dnsLookup(website))
-        Serial.println(F("[*] DNS failed"));
+//        Serial.println(F("[*] DNS failed"));
 #elif 2
     // if website is a string containing an IP address instead of a domain name,
   // then use it directly. Note: the string can not be in PROGMEM.
@@ -46,7 +47,7 @@ void etherInit(){
 
 }
 
-void POSTRequest(int id) {
+void POSTRequest(int id, uint8_t ison) {
     wdt_reset();
     Stash stash;
 //    Serial.println();
@@ -56,6 +57,8 @@ void POSTRequest(int id) {
 
     stash.print(F("id="));
     stash.print(id);
+    stash.print(F("ison="));
+    stash.print(ison);
     stash.print(F("&status="));
     stash.println(F("false"));
     stash.save();
