@@ -14,13 +14,20 @@ SoftwareSerial master(PIN_RX, PIN_TX);
 *************************************************************/
 
 void etherInit(){
-    Serial.println(F("\n[webClient]"));
+#ifdef DEV
+        master.println(F("\n[webClient]"));
+#endif
+
 
     if (ether.begin(sizeof Ethernet::buffer, mymac, SS) == 0) {
-        Serial.println(F("[*] Failed Ethernet controller"));
+#ifdef DEV
+        master.println(F("[*] Failed Ethernet controller"));
+#endif
     }
     if (!ether.dhcpSetup())
-        Serial.println(F("[*] DHCP failed"));
+#ifdef DEV
+        master.println(F("[*] DHCP failed"));
+#endif
 
     ether.printIp(F("[*] IP:  "), ether.myip);
 //    ether.printIp("[*] GW:  ", ether.gwip);
@@ -29,7 +36,9 @@ void etherInit(){
 #if 1
     // use DNS to resolve the website's IP address
     if (!ether.dnsLookup(website))
-        Serial.println(F("[*] DNS failed"));
+#ifdef DEV
+        master.println(F("[*] DNS failed"));
+#endif
 #elif 2
     // if website is a string containing an IP address instead of a domain name,
   // then use it directly. Note: the string can not be in PROGMEM.

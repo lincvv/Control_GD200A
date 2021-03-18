@@ -8,6 +8,8 @@
 #include <avr/wdt.h>
 #include <SoftwareSerial.h>
 
+#define DEV
+
 #define PIN_RX 8 //2
 #define PIN_TX 9 //3
 

@@ -8,14 +8,10 @@
 #include "lan.h"
 #include <Arduino.h>
 #include <ModbusMaster.h>
-//#include <SoftwareSerial.h>
-//#include <ArduinoJson.h>
 //#include <avr/eeprom.h>
 //#include <EEPROM.h>
 
 #define REQUEST_INTERVAL 5000
-//#define PIN_RX 8 //2
-//#define PIN_TX 9 //3
 #define PIN_RE_DE 5
 #define PIN_LOOP_CONNECT 6
 #define A_FREQ_REGISTER_R_W 0x2001
