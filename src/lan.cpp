@@ -8,8 +8,6 @@
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[400];
 byte session;
-
-
 /************************************************************
 [*] functions
 *************************************************************/
@@ -47,7 +45,7 @@ void etherInit(){
 
 }
 
-void POSTRequest(int id, uint8_t ison) {
+void POSTRequest(int id, uint8_t ison, uint16_t freq) {
     wdt_reset();
     Stash stash;
 //    Serial.println();
@@ -59,8 +57,10 @@ void POSTRequest(int id, uint8_t ison) {
     stash.print(id);
     stash.print(F("ison="));
     stash.print(ison);
-    stash.print(F("&status="));
-    stash.println(F("false"));
+    stash.print(F("freq="));
+    stash.print(freq);
+//    stash.print(F("&status="));
+//    stash.println(F("false"));
     stash.save();
     int stash_size = stash.size();
 

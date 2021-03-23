@@ -8,6 +8,7 @@
 extern byte session;
 static uint32_t timer;
 uint8_t isOn __attribute__ ((section (".noinit")));
+uint16_t freq __attribute__ ((section (".noinit")));
 uint8_t mcusr_f __attribute__ ((section (".noinit")));
 static uint16_t time_off __attribute__ ((section (".noinit")));
 static uint16_t timer_time_off __attribute__ ((section (".noinit")));
@@ -28,17 +29,23 @@ void setup () {
     initIO();
 
     if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
+        Serial.println(F("[*] Reboot ==> EXTRF"));
         count_notfound = 0;
         count_ether_failed = 0;
         timer_time_off = 0;
         time_off = 0;
         isOn = 0;
-//        Serial.println("[*] Reboot ==> EXTRF");
+        freq = 2700;
+        uint8_t res;
+        res = node.writeSingleRegister(0x2001, freq);
+        if(res != node.ku8MBSuccess){
+            Serial.println(res);
+        }
         set_state(isOn);
 
     }
     if (mcusr_f & _BV(WDRF)){
-        master.println(F("[*] Reboot ==> WDRF"));
+        Serial.println(F("[*] Reboot ==> WDRF"));
     }
 
     wdt_enable(WDTO_4S);
@@ -59,15 +66,25 @@ void loop () {
     if (millis() > timer) {
         wdt_reset();
         timer = millis() + REQUEST_INTERVAL;
-        master.println(count_notfound);
+//        Serial.println(count_notfound);
 //        Serial.println(count_ether_failed);
-        uint8_t res;
-        res = node.readHoldingRegisters(0x2100, 01);
-        if(res == node.ku8MBSuccess){
-            res = node.getResponseBuffer(0);
+
+        uint16_t res_f;
+        res_f = node.readHoldingRegisters(0x2001, 01);
+        if(res_f == node.ku8MBSuccess){
+            res_f = node.getResponseBuffer(0);
+            Serial.println(res_f);
+        }
+        uint8_t status;
+        status = node.readHoldingRegisters(0x2100, 01);
+
+        if(status == node.ku8MBSuccess){
+            status = node.getResponseBuffer(0);
+            Serial.println(status);
             }
         wdt_reset();
-        POSTRequest(1, res);
+
+        POSTRequest(1, isOn, freq);
         digitalWrite(PIN_LOOP_CONNECT, !digitalRead(PIN_LOOP_CONNECT));
         check_timer();
     }
@@ -76,12 +93,12 @@ void loop () {
 
     if (reply != 0) {
         if (strncmp(reply + 9, "201 Created", 11) == 0){
-            master.println(F("[*] 201"));
+            Serial.println(F("[*] 201"));
             timer_time_off = 0;
             delay(30);
-            ether.browseUrl(PSTR("/api/1/"), " ", website, callbackGETResponse);
+            ether.browseUrl(PSTR("/api/1/"), " ", website, PSTR("accept: application/json"), callbackGETResponse);
         } else{
-            master.println(reply);
+            Serial.println(reply);
             count_notfound++;
         }
         wdt_reset();
@@ -96,7 +113,7 @@ static void check_timer(){
     if (isOn != 0){
         if (timer_time_off == 12){
             time_off--;
-            master.printf(F("[*] timer min ==> %d\n"), time_off);
+            Serial.printf(F("[*] timer min ==> %d\n"), time_off);
             if(time_off == 0){
                 time_off = 0;
                 isOn = 0;
@@ -121,11 +138,13 @@ static void reConnect(){
 
 static void set_state(uint8_t state){
     wdt_reset();
-    master.println(F("set_state"));
+    Serial.println(F("set_state"));
     if (state == 1)
     {
 //        node.readHoldingRegisters(0x2100, 01);
         node.writeSingleRegister(0x2000, 0x0001);
+//        node.writeSingleRegister(0x2005, 20000);
+
 //        digitalWrite(PIN_ON_INV, HIGH);
 //        delay(1000);
 //        digitalWrite(PIN_ON_INV, LOW);
@@ -176,12 +195,12 @@ static void parseResp(String* res_data){
 static void initIO(){
     master.begin(9600);
     Serial.begin(9600);
-    node.begin(1, Serial);
+    node.begin(1, master);
     node.preTransmission(preTransmission);
     node.postTransmission(postTransmission);
     pinMode(PIN_RE_DE, OUTPUT);
-    pinMode(PIN_ON_INV, OUTPUT);
-    pinMode(PIN_OFF_INV, OUTPUT);
+//    pinMode(PIN_ON_INV, OUTPUT);
+//    pinMode(PIN_OFF_INV, OUTPUT);
     pinMode(PIN_LOOP_CONNECT, OUTPUT);
     digitalWrite(PIN_RE_DE, LOW);
 }
@@ -191,19 +210,18 @@ static void initIO(){
 *************************************************************/
 static void callbackGETResponse(byte status, word off, word len){
 
-//    Serial.println("[*] GET RESPONSE");
     Ethernet::buffer[off+300] = 0;
     const char* reply = (const char*) Ethernet::buffer + off;
 
     if (strncmp(reply + 9, "200 OK", 6) != 0) {
         count_notfound++;
-        master.println(reply);
+        Serial.println(reply);
         return;
     }
 
     String resp = reply;
     parseResp(&resp);
-    master.printf(F("\nisOn: %d\n"), isOn);
+    Serial.printf(F("\nisOn: %d\n"), isOn);
     wdt_reset();
 }
 
@@ -252,3 +270,9 @@ void postTransmission()
 //            state_isOn = isOn;
 //        }
 //    }
+
+
+//char get_r[20];
+//sprintf(get_r, "%s/", "A4CF129ABF74");
+//Serial.println(get_r);
+//ether.browseUrl(PSTR("/api/moisture/setting/by/"), get_r, website, PSTR("accept: application/json"), callbackGETResponse);
