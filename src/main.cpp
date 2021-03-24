@@ -5,7 +5,6 @@
 /************************************************************
 [*] init variables
 *************************************************************/
-extern byte session;
 static uint32_t timer;
 uint8_t isOn __attribute__ ((section (".noinit")));
 uint16_t freq __attribute__ ((section (".noinit")));
@@ -34,16 +33,20 @@ void setup () {
         count_ether_failed = 0;
         timer_time_off = 0;
         time_off = 0;
-        isOn = 0;
-        freq = 2700;
-        uint8_t res;
-        res = node.writeSingleRegister(0x2001, freq);
-        if(res != node.ku8MBSuccess){
-            Serial.println(res);
+        isOn = STATE_OFF;
+        freq = 2500;
+        uint8_t modbus_res;
+        modbus_res = node.writeSingleRegister(A_FREQ_REGISTER_R_W, freq);
+        if(modbus_res != node.ku8MBSuccess){
+            Serial.println(modbus_res);
         }
-        set_state(isOn);
+        modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
+        if(modbus_res != node.ku8MBSuccess){
+            Serial.println(modbus_res);
+        }
 
     }
+
     if (mcusr_f & _BV(WDRF)){
         Serial.println(F("[*] Reboot ==> WDRF"));
     }
@@ -69,38 +72,28 @@ void loop () {
 //        Serial.println(count_notfound);
 //        Serial.println(count_ether_failed);
 
-        uint16_t res_f;
-        res_f = node.readHoldingRegisters(0x2001, 01);
+        uint8_t res_f;
+        res_f = node.readHoldingRegisters(A_FREQ_REGISTER_R_W, QUANTITY_REGISTER);
         if(res_f == node.ku8MBSuccess){
-            res_f = node.getResponseBuffer(0);
-            Serial.println(res_f);
+            freq = node.getResponseBuffer(0);
+            Serial.println(freq);
         }
-        uint8_t status;
-        status = node.readHoldingRegisters(0x2100, 01);
 
+        uint8_t status;
+        status = node.readHoldingRegisters(A_STATE_REGISTER_R, QUANTITY_REGISTER);
         if(status == node.ku8MBSuccess){
-            status = node.getResponseBuffer(0);
-            Serial.println(status);
+            isOn = node.getResponseBuffer(0);
             }
         wdt_reset();
+        Serial.print("status: ");
+        Serial.println(status);
+        char get_r[20];
+        sprintf(get_r, "%d/%d/", isOn, freq);
 
-        POSTRequest(1, isOn, freq);
+        ether.browseUrl(PSTR("/api/devices/1/"), get_r, website, PSTR("accept: application/json"), callbackGETResponse);
+
         digitalWrite(PIN_LOOP_CONNECT, !digitalRead(PIN_LOOP_CONNECT));
         check_timer();
-    }
-
-    const char* reply = ether.tcpReply(session);
-
-    if (reply != 0) {
-        if (strncmp(reply + 9, "201 Created", 11) == 0){
-            Serial.println(F("[*] 201"));
-            timer_time_off = 0;
-            delay(30);
-            ether.browseUrl(PSTR("/api/1/"), " ", website, PSTR("accept: application/json"), callbackGETResponse);
-        } else{
-            Serial.println(reply);
-            count_notfound++;
-        }
         wdt_reset();
     }
 }
@@ -110,14 +103,17 @@ void loop () {
 *************************************************************/
 
 static void check_timer(){
-    if (isOn != 0){
+    if (isOn != 3){
         if (timer_time_off == 12){
             time_off--;
             Serial.printf(F("[*] timer min ==> %d\n"), time_off);
             if(time_off == 0){
                 time_off = 0;
-                isOn = 0;
-                set_state(isOn);
+                isOn = STATE_OFF;
+                uint8_t modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
+                if(modbus_res != node.ku8MBSuccess){
+                    Serial.println(modbus_res);
+                }
             }
             reConnect();
         }
@@ -134,30 +130,6 @@ static void reConnect(){
     timer_time_off = 0;
     wdt_enable(WDTO_15MS);
     delay(20);
-}
-
-static void set_state(uint8_t state){
-    wdt_reset();
-    Serial.println(F("set_state"));
-    if (state == 1)
-    {
-//        node.readHoldingRegisters(0x2100, 01);
-        node.writeSingleRegister(0x2000, 0x0001);
-//        node.writeSingleRegister(0x2005, 20000);
-
-//        digitalWrite(PIN_ON_INV, HIGH);
-//        delay(1000);
-//        digitalWrite(PIN_ON_INV, LOW);
-    }
-    else
-    {
-//        node.readHoldingRegisters(0x2100, 01);
-        node.writeSingleRegister(0x2000, 0x0005);
-//        digitalWrite(PIN_OFF_INV, HIGH);
-//        delay(1000);
-//        digitalWrite(PIN_OFF_INV, LOW);
-    }
-    wdt_reset();
 }
 
 String getValue(const String* data, char separator, int index)
@@ -179,17 +151,40 @@ String getValue(const String* data, char separator, int index)
 static void parseResp(String* res_data){
     wdt_reset();
     timer_time_off = 0;
-    *res_data = res_data->substring(res_data->indexOf('{') , res_data->lastIndexOf('}') + 1);
-    String temp_json = res_data->substring(res_data->indexOf('{') + 1, res_data->lastIndexOf(','));
+    uint8_t modbus_res;
+    *res_data = res_data->substring(res_data->indexOf('{') + 1 , res_data->lastIndexOf('}'));
+    Serial.println(*res_data);
+
+    //state
+    String temp_json = getValue(res_data, ',', 0);
     temp_json = getValue(&temp_json, ':', 1);
     uint8_t data_isOn = temp_json.toInt();
     if (isOn != data_isOn){
         isOn = data_isOn;
-        set_state(isOn);
+        modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
+        if(modbus_res != node.ku8MBSuccess){
+            Serial.println(modbus_res);
+        }
     }
-    temp_json = res_data->substring(res_data->indexOf(',') + 1, res_data->lastIndexOf('}'));
+
+    //freq
+    temp_json = getValue(res_data, ',', 2);
+    temp_json = getValue(&temp_json, ':', 1);
+    uint16_t data_freq = temp_json.toInt();
+    if (freq != data_freq){
+        freq = data_freq;
+        modbus_res = node.writeSingleRegister(A_FREQ_REGISTER_R_W, freq);
+        if(modbus_res != node.ku8MBSuccess){
+            Serial.println(modbus_res);
+        }
+    }
+
+    //time
+    temp_json = getValue(res_data, ',', 1);
     temp_json = getValue(&temp_json, ':', 1);
     time_off = temp_json.toInt();
+    wdt_reset();
+
 }
 
 static void initIO(){
@@ -199,8 +194,6 @@ static void initIO(){
     node.preTransmission(preTransmission);
     node.postTransmission(postTransmission);
     pinMode(PIN_RE_DE, OUTPUT);
-//    pinMode(PIN_ON_INV, OUTPUT);
-//    pinMode(PIN_OFF_INV, OUTPUT);
     pinMode(PIN_LOOP_CONNECT, OUTPUT);
     digitalWrite(PIN_RE_DE, LOW);
 }
@@ -238,41 +231,3 @@ void postTransmission()
 /************************************************************
 [*]
 *************************************************************/
-
-//    const char* postDataChar = "id=1";
-//    ether.httpPost(PSTR("/api/val/"), website, NULL,
-//                   postDataChar,
-//                   POSTCallbackResp);
-
-//static void POSTCallbackResp(byte status, word off, word len){
-//    Ethernet::buffer[off+300] = 0;
-//    const char* reply = (const char*) Ethernet::buffer + off;
-//    Serial.println(reply);
-//}
-
-//    String resp = reply;
-//    resp = resp.substring(resp.indexOf('{'), resp.lastIndexOf('}') + 1);
-
-//    StaticJsonDocument<200> doc;
-//    DeserializationError error = deserializeJson(doc, reply);
-//    if (error) {
-//        Serial.println("[*] deserializeJson() failed: ");
-//        Serial.println(error.c_str());
-//        Serial.print("[*] ");
-//        Serial.println(resp);
-//        return;
-//    } else{
-//        timer_time_off = 0;
-//        isOn = doc["IsOn"];
-//        time_off = doc["Time"];
-//        if (state_isOn != isOn){
-//            set_state(isOn);
-//            state_isOn = isOn;
-//        }
-//    }
-
-
-//char get_r[20];
-//sprintf(get_r, "%s/", "A4CF129ABF74");
-//Serial.println(get_r);
-//ether.browseUrl(PSTR("/api/moisture/setting/by/"), get_r, website, PSTR("accept: application/json"), callbackGETResponse);
