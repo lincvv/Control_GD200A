@@ -6,8 +6,12 @@
 #define LONOFF_LAN_H
 #include <EtherCard.h>
 #include <avr/wdt.h>
+#include <SoftwareSerial.h>
 
-const char website[] PROGMEM = "test.itlab.com.ua";
+#define PIN_RX 8 //2
+#define PIN_TX 9 //3
+
+const char website[] PROGMEM = "fe.laboratory.co.il";
 
 void etherInit();
 #endif //LONOFF_LAN_H

@@ -13,8 +13,8 @@ static uint16_t time_off __attribute__ ((section (".noinit")));
 static uint16_t timer_time_off __attribute__ ((section (".noinit")));
 uint8_t count_notfound __attribute__ ((section (".noinit")));
 uint8_t count_ether_failed __attribute__ ((section (".noinit")));
-SoftwareSerial master(PIN_RX, PIN_TX);
 ModbusMaster node;
+extern SoftwareSerial master;
 
 //void(* resetFunc) (void) = 0;
 /************************************************************
