@@ -21,12 +21,19 @@
 #define STATE_OFF 5
 
 void preTransmission();
+
 void postTransmission();
+
 static void initIO();
+
 static void check_timer();
+
 static void reConnect();
-static void parseResp(String* reply);
+
+static void parseResp(String *reply);
+
 static void callbackGETResponse(byte status, word off, word len);
-String getValue(const String* data, char separator, int index);
+
+String getValue(const String *data, char separator, int index);
 
 #endif //LONOFF_MAIN_H

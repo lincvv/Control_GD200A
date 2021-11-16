@@ -2,6 +2,7 @@
 [*] include
 *************************************************************/
 #include "main.h"
+
 /************************************************************
 [*] init variables
 *************************************************************/
@@ -22,13 +23,13 @@ extern SoftwareSerial master;
 [*] code
 *************************************************************/
 
-void setup () {
+void setup() {
     mcusr_f = MCUSR;
     MCUSR = 0;
     wdt_disable();
     initIO();
 
-    if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)){
+    if (mcusr_f & _BV(EXTRF) || mcusr_f & _BV(PORF)) {
 #ifdef DEV
         master.println(F("[*] Reboot ==> EXTRF"));
 #endif
@@ -40,13 +41,13 @@ void setup () {
         freq = 2500;
         uint8_t modbus_res;
         modbus_res = node.writeSingleRegister(A_FREQ_REGISTER_R_W, freq);
-        if(modbus_res != node.ku8MBSuccess){
+        if (modbus_res != node.ku8MBSuccess) {
 #ifdef DEV
             master.println(modbus_res);
 #endif
         }
         modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
-        if(modbus_res != node.ku8MBSuccess){
+        if (modbus_res != node.ku8MBSuccess) {
 #ifdef DEV
             master.println(modbus_res);
 #endif
@@ -54,7 +55,7 @@ void setup () {
 
     }
 
-    if (mcusr_f & _BV(WDRF)){
+    if (mcusr_f & _BV(WDRF)) {
 #ifdef DEV
         master.println(F("[*] Reboot ==> WDRF"));
 #endif
@@ -64,7 +65,7 @@ void setup () {
     check_timer();
     etherInit();
     wdt_enable(WDTO_8S);
-    digitalWrite(PIN_LOOP_CONNECT, HIGH );
+    digitalWrite(PIN_LOOP_CONNECT, HIGH);
 
 }
 
@@ -72,7 +73,7 @@ void setup () {
 [*] loop
 *************************************************************/
 
-void loop () {
+void loop() {
     ether.packetLoop(ether.packetReceive());
 
     if (millis() > timer) {
@@ -85,7 +86,7 @@ void loop () {
 
         uint8_t res_f;
         res_f = node.readHoldingRegisters(A_FREQ_REGISTER_R_W, QUANTITY_REGISTER);
-        if(res_f == node.ku8MBSuccess){
+        if (res_f == node.ku8MBSuccess) {
             freq = node.getResponseBuffer(0);
 #ifdef DEV
             master.println(freq);
@@ -94,7 +95,7 @@ void loop () {
 
         uint8_t res_state;
         res_state = node.readHoldingRegisters(A_STATE_REGISTER_R, QUANTITY_REGISTER);
-        if(res_state == node.ku8MBSuccess){
+        if (res_state == node.ku8MBSuccess) {
             status_reg = node.getResponseBuffer(0);
         }
         wdt_reset();
@@ -117,18 +118,18 @@ void loop () {
 [*] functions
 *************************************************************/
 
-static void check_timer(){
-    if (isOn != STATE_OFF){
-        if (timer_time_off == 12){
+static void check_timer() {
+    if (isOn != STATE_OFF) {
+        if (timer_time_off == 12) {
             time_off--;
 #ifdef DEV
             master.printf(F("[*] timer min ==> %d\n"), time_off);
 #endif
-            if(time_off == 0){
+            if (time_off == 0) {
                 time_off = 0;
                 isOn = STATE_OFF;
                 uint8_t modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
-                if(modbus_res != node.ku8MBSuccess){
+                if (modbus_res != node.ku8MBSuccess) {
 #ifdef DEV
                     master.println(modbus_res);
 #endif
@@ -136,7 +137,7 @@ static void check_timer(){
             }
             reConnect();
         }
-    }else if((timer_time_off >= 6)){ //если нет сети через 30 сек. сделать reset
+    } else if ((timer_time_off >= 6)) { //если нет сети через 30 сек. сделать reset
         reConnect();
     }
 #ifdef DEV
@@ -146,34 +147,33 @@ static void check_timer(){
     wdt_reset();
 }
 
-static void reConnect(){
+static void reConnect() {
     count_ether_failed++;
     timer_time_off = 0;
     wdt_enable(WDTO_15MS);
     delay(20);
 }
 
-String getValue(const String* data, char separator, int index)
-{
+String getValue(const String *data, char separator, int index) {
     int found = 0;
-    int strIndex[] = { 0, -1 };
+    int strIndex[] = {0, -1};
     unsigned int maxIndex = data->length() - 1;
 
     for (int i = 0; i <= maxIndex && found <= index; i++) {
         if (data->charAt(i) == separator || i == maxIndex) {
             found++;
             strIndex[0] = strIndex[1] + 1;
-            strIndex[1] = (i == maxIndex) ? i+1 : i;
+            strIndex[1] = (i == maxIndex) ? i + 1 : i;
         }
     }
     return found > index ? data->substring(strIndex[0], strIndex[1]) : "";
 }
 
-static void parseResp(String* res_data){
+static void parseResp(String *res_data) {
     wdt_reset();
     timer_time_off = 0;
     uint8_t modbus_res;
-    *res_data = res_data->substring(res_data->indexOf('{') + 1 , res_data->lastIndexOf('}'));
+    *res_data = res_data->substring(res_data->indexOf('{') + 1, res_data->lastIndexOf('}'));
 #ifdef DEV
     master.println(*res_data);
 #endif
@@ -182,10 +182,10 @@ static void parseResp(String* res_data){
     String temp_json = getValue(res_data, ',', 0);
     temp_json = getValue(&temp_json, ':', 1);
     uint8_t data_isOn = temp_json.toInt();
-    if (isOn != data_isOn){
+    if (isOn != data_isOn) {
         isOn = data_isOn;
         modbus_res = node.writeSingleRegister(A_SET_STATE_REGISTER_W, isOn);
-        if(modbus_res != node.ku8MBSuccess){
+        if (modbus_res != node.ku8MBSuccess) {
 #ifdef DEV
             master.println(modbus_res);
 #endif
@@ -196,10 +196,10 @@ static void parseResp(String* res_data){
     temp_json = getValue(res_data, ',', 2);
     temp_json = getValue(&temp_json, ':', 1);
     uint16_t data_freq = temp_json.toInt();
-    if (freq != data_freq){
+    if (freq != data_freq) {
         freq = data_freq;
         modbus_res = node.writeSingleRegister(A_FREQ_REGISTER_R_W, freq);
-        if(modbus_res != node.ku8MBSuccess){
+        if (modbus_res != node.ku8MBSuccess) {
 #ifdef DEV
             master.println(modbus_res);
 #endif
@@ -214,7 +214,7 @@ static void parseResp(String* res_data){
 
 }
 
-static void initIO(){
+static void initIO() {
     master.begin(9600);
     Serial.begin(9600);
     node.begin(1, Serial);
@@ -228,10 +228,10 @@ static void initIO(){
 /************************************************************
 [*] callbacks
 *************************************************************/
-static void callbackGETResponse(byte status, word off, word len){
+static void callbackGETResponse(byte status, word off, word len) {
 
-    Ethernet::buffer[off+300] = 0;
-    const char* reply = (const char*) Ethernet::buffer + off;
+    Ethernet::buffer[off + 300] = 0;
+    const char *reply = (const char *) Ethernet::buffer + off;
 
     if (strncmp(reply + 9, "200 OK", 6) != 0) {
         count_notfound++;
@@ -249,13 +249,11 @@ static void callbackGETResponse(byte status, word off, word len){
     wdt_reset();
 }
 
-void preTransmission()
-{
+void preTransmission() {
     digitalWrite(PIN_RE_DE, HIGH);
 }
 
-void postTransmission()
-{
+void postTransmission() {
     digitalWrite(PIN_RE_DE, LOW);
 }
 

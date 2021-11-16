@@ -2,10 +2,11 @@
 [*] include
 *************************************************************/
 #include "lan.h"
+
 /************************************************************
 [*] init variables
 *************************************************************/
-static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
+static byte mymac[] = {0x74, 0x69, 0x69, 0x2D, 0x30, 0x31};
 byte Ethernet::buffer[400];
 SoftwareSerial master(PIN_RX, PIN_TX);
 
@@ -13,9 +14,9 @@ SoftwareSerial master(PIN_RX, PIN_TX);
 [*] functions
 *************************************************************/
 
-void etherInit(){
+void etherInit() {
 #ifdef DEV
-        master.println(F("\n[webClient]"));
+    master.println(F("\n[webClient]"));
 #endif
 
 
@@ -40,14 +41,14 @@ void etherInit(){
         master.println(F("[*] DNS failed"));
 #endif
 #elif 2
-    // if website is a string containing an IP address instead of a domain name,
-  // then use it directly. Note: the string can not be in PROGMEM.
-  char websiteIP[] = "192.168.1.1";
-  ether.parseIp(ether.hisip, websiteIP);
+        // if website is a string containing an IP address instead of a domain name,
+      // then use it directly. Note: the string can not be in PROGMEM.
+      char websiteIP[] = "192.168.1.1";
+      ether.parseIp(ether.hisip, websiteIP);
 #else
-  // or provide a numeric IP address instead of a string
-  byte hisip[] = { 192,168,1,1 };
-  ether.copyIp(ether.hisip, hisip);
+      // or provide a numeric IP address instead of a string
+      byte hisip[] = { 192,168,1,1 };
+      ether.copyIp(ether.hisip, hisip);
 #endif
 
 //    ether.printIp("[*] SRV: ", ether.hisip);
