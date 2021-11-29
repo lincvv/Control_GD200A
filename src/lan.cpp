@@ -25,21 +25,22 @@ void etherInit() {
         master.println(F("[*] Failed Ethernet controller"));
 #endif
     }
-    if (!ether.dhcpSetup())
+    if (!ether.dhcpSetup()) {
 #ifdef DEV
         master.println(F("[*] DHCP failed"));
 #endif
-
+    }
     ether.printIp(F("[*] IP:  "), ether.myip);
 //    ether.printIp("[*] GW:  ", ether.gwip);
 //    ether.printIp("[*] DNS: ", ether.dnsip);
 
 #if 1
     // use DNS to resolve the website's IP address
-    if (!ether.dnsLookup(website))
+    if (!ether.dnsLookup(website)) {
 #ifdef DEV
         master.println(F("[*] DNS failed"));
 #endif
+    }
 #elif 2
         // if website is a string containing an IP address instead of a domain name,
       // then use it directly. Note: the string can not be in PROGMEM.

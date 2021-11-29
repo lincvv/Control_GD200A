@@ -19,6 +19,7 @@
 #define A_SET_STATE_REGISTER_W 0x2000
 #define QUANTITY_REGISTER 01
 #define STATE_OFF 5
+#define STATE_ON 1
 
 void preTransmission();
 
