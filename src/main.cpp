@@ -190,6 +190,7 @@ static void parseResp(String *res_data) {
             master.println(modbus_res);
 #endif
         }
+        return;
     }
 
     //freq
