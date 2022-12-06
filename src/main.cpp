@@ -120,7 +120,7 @@ void loop() {
 
 static void check_timer() {
     if (isOn != STATE_OFF) {
-        if (timer_time_off == 12) {
+        if (timer_time_off == 12) { // Проверяем что 12 раз не вызывался callbackGETResponse
             time_off--;
 #ifdef DEV
             master.printf(F("[*] timer min ==> %d\n"), time_off);
