@@ -15,5 +15,14 @@
 
 const char website[] PROGMEM = "MY SITE";
 
+/**
+ * @brief Initiates the connection to the Ethereum network.
+ *
+ * This function opens a connection to the Ethereum network and initializes the necessary components.
+ * It establishes a communication channel with the network and prepares the system for interacting
+ * with Ethereum contracts and performing transactions.
+ *
+ * @return void.
+ */
 void etherInit();
 #endif //CONTROL_GD200A_LAN_H

@@ -10,10 +10,16 @@ static byte mymac[] = {0x74, 0x69, 0x69, 0x2D, 0x30, 0x31};
 byte Ethernet::buffer[400];
 SoftwareSerial master(PIN_RX, PIN_TX);
 
-/************************************************************
-[*] functions
-*************************************************************/
-
+/**
+ * @brief Initializes the Ethernet module.
+ *
+ * This function is responsible for initializing the Ethernet module. It performs the necessary
+ * setup and configuration to enable the Ethernet communication.
+ *
+ * @note This function must be called before any other Ethernet-related functions are called.
+ *
+ * @return void.
+ */
 void etherInit() {
 #ifdef DEV
     master.println(F("\n[webClient]"));
@@ -42,7 +48,7 @@ void etherInit() {
 #endif
     }
 #elif 2
-        // if website is a string containing an IP address instead of a domain name,
+      // if website is a string containing an IP address instead of a domain name,
       // then use it directly. Note: the string can not be in PROGMEM.
       char websiteIP[] = "192.168.1.1";
       ether.parseIp(ether.hisip, websiteIP);
